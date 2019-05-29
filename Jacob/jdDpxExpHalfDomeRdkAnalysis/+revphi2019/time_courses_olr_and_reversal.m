@@ -7,7 +7,7 @@ function time_courses_olr_and_reversal
     options.min_spline_r2=0;
     options.detrend_per_mouse=true;
     options.nrows=4;
-    options.include_mice=1:9; % 0 and 1:9 mean all mice, 1 means mouse 1 etc, [1 2 4 5] means these mice
+    options.include_mice=1; % 0 and 1:9 mean all mice, 1 means mouse 1 etc, [1 2 4 5] means these mice
     options.freezeflips=[1 2 3 4 5 6 7]; % freezeflips to keep
     options.pool_freezeflips=false;
     options.reversal_measure='signed absolute product'; % tstat, linear, multiplicative, divisive, signrank, ttest
@@ -19,10 +19,15 @@ function time_courses_olr_and_reversal
     % remove the unlimited lifetime data
     D=dpxdSubset(D,D.mode~='u');
     
-    % remove the freezeflips that we dont' want to analyse
+    % remove the freezeflips that we don't want to analyse
     D=dpxdSubset(D,ismember(D.ff,options.freezeflips));
     if options.pool_freezeflips
         D.freezeflip=666;
+    end
+    
+    % keep only the mice we want to analyze (include_mice=0 means all)
+    if options.include_mice
+        D=dpxdSubset(D,ismember(D.mouse,options.include_mice)); % for debugging
     end
     
     D=subset_trials_by_pitch_and_roll(D,options);
@@ -41,9 +46,7 @@ function time_courses_olr_and_reversal
         D=dpxdMerge(D);
     end
     
-    if options.include_mice
-        D=dpxdSubset(D,ismember(D.mouse,options.include_mice)); % for debugging
-    end
+
     
     
     % plot mean OLRs
