@@ -4,7 +4,7 @@ function time_courses_olr_and_reversal
     options.roll_range=[-Inf Inf];
     options.min_trials_per_condition=25;
     options.splineroughness=1/3;
-    options.min_spline_r2=eps;
+    options.min_spline_r2=0;
     options.detrend_per_mouse=true;
     options.nrows=4;
     options.include_mice=1:9; % 0 and 1:9 mean all mice, 1 means mouse 1 etc, [1 2 4 5] means these mice
