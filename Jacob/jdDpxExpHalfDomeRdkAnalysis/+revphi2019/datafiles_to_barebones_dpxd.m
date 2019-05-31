@@ -14,23 +14,28 @@ function DPXD=datafiles_to_barebones_dpxd(files)
         end
     end
     
-    maxFrDropsPerSec=5;
-    response_interval=-0.5:0.02:3;
-
+    response_interval_sec=-1:1/60:3; % (60Hz)
+    response_interval_sec([1 end])=[]; % remove first and last because often missing (would be nan value at 1 and 3 otherwise)
     
-    E={};
-    out.nFilesWithDataWithinWindow=0;
+    E={};    
     for i=1:numel(files)
+        fprintf('[%s] Loading %s...\n',mfilename,files{i});
         D=dpxdLoad(files{i});
-
-        [D,percentBadTrials] = removeTrialWithTooManyFramedrops(D,maxFrDropsPerSec/D.window_measuredFrameRate(1)*100);
-        disp(['File #' num2str(i,'%.3d') ': ' num2str(round(percentBadTrials)) '% of trials had more than ' num2str(maxFrDropsPerSec) ' video-frame drops per second']);
-        if percentBadTrials>50
-            fprintf(' ---> skipping file : %s\n', files{i} );
-            continue
+        
+        % check the subject id and fix if necessary
+        id_dpxd=cell2mat(unique(D.exp_subjectId));
+        [~,fname]=fileparts(files{i});
+        id_filename = fname(find(fname=='-',1,'first')+1:find(fname=='-',1,'last')-1);
+        if ~strcmpi(id_dpxd,id_filename)
+            fprintf('WARNING! ID in DPXD is %s but in filename it''s %s!!!\n',id_dpxd,id_filename);
+            %  fprintf('   Assuming it was entered wrong when recording and then corrected later in the fileNAME only\n');
+            %  fprintf('   Replaced the subject ID in the dpxd with the ID from the filename...\n');
+            %  D.exp_subjectId=repmat({id_filename},1,D.N);
+         %   fprintf(' ---> skipping file : %s\n', files{i} );
+         %   continue
         end
-        %
-        [D,suspect]=clarifyAndCheck(D,response_interval);
+
+        [D,suspect]=clarifyAndCheck(D,response_interval_sec);
         if ~suspect
             % Only include data files that are completely fine and have no suspicious
             % things happening, like poor correlations between the yaw measurements of
@@ -60,15 +65,7 @@ function DPXD=datafiles_to_barebones_dpxd(files)
     end
 end
 
-function [D,percentTrials] = removeTrialWithTooManyFramedrops(D,thresholdPercent)
-    % Remove trials with too many framedrops
-    framesPerTrial = (D.stopSec-D.startSec).*D.window_measuredFrameRate;
-    okTrials = (D.nrMissedFlips./framesPerTrial)*100<thresholdPercent;
-    percentTrials = sum(~okTrials)/numel(okTrials)*100;
-    D = dpxdSubset(D,okTrials);
-end
-
-function [D,suspect]=clarifyAndCheck(D,response_interval)
+function [D,suspect]=clarifyAndCheck(D,response_interval_sec)
     % Make some changes to the DPXD that make the analysis easier to read;
 
     % Step 0 remove the first sample (outlier probably because mouse
@@ -102,13 +99,13 @@ function [D,suspect]=clarifyAndCheck(D,response_interval)
     % apply interpolation to get the data on the specified reponse_interval
     for t=1:D.N
         D.resp_yaw_corr{t}=corr(D.resp_mouseBack_dyPx{t}(:),D.resp_mouseSide_dyPx{t}(:));
-        D.resp_tSec{t}=response_interval;
+        D.resp_tSec{t}=response_interval_sec;
         tsec=mean([D.resp_mouseBack_tSec{t}(:) D.resp_mouseSide_tSec{t}(:)],2)'; 
-        backyaw=interp1(tsec,D.resp_mouseBack_dyPx{t},response_interval,'linear');
-        sideyaw=interp1(tsec,D.resp_mouseSide_dyPx{t},response_interval,'linear');
+        backyaw=interp1(tsec,D.resp_mouseBack_dyPx{t},response_interval_sec,'linear');
+        sideyaw=interp1(tsec,D.resp_mouseSide_dyPx{t},response_interval_sec,'linear');
         D.resp_yaw{t}=mean([backyaw(:) sideyaw(:)],2)';
-        D.resp_pitch{t}=interp1(tsec,D.resp_mouseBack_dxPx{t},response_interval,'linear');
-        D.resp_roll{t}=interp1(tsec,D.resp_mouseSide_dxPx{t},response_interval,'linear');
+        D.resp_pitch{t}=interp1(tsec,D.resp_mouseBack_dxPx{t},response_interval_sec,'linear');
+        D.resp_roll{t}=interp1(tsec,D.resp_mouseSide_dxPx{t},response_interval_sec,'linear');
     end
     % Step 4: Convert yaw pixels/frame to deg/s (added 20170710)
     scalar = jdDpxExpHalfDomeAuToDps;
@@ -118,7 +115,7 @@ function [D,suspect]=clarifyAndCheck(D,response_interval)
         D.resp_roll{i}=D.resp_roll{i}*scalar;
     end
     % See if the file is up to snuff
-    suspect = false;
+    suspect = false; % no checks performed as of yet
 end
 
 function B=barebonesify(E)
@@ -145,14 +142,15 @@ function B=barebonesify(E)
         B{i}.mouse=E{i}.exp_subjectId(1);
         B{i}.ff=E{i}.rdk_freezeFlip(1);
         B{i}.mode=E{i}.stimmode(1);
-        B{i}.dps=E{i}.rdk_aziDps(1);
-        B{i}.ms=E{i}.resp_tSec{1}(:);
+        B{i}.dps=E{i}.rdk_aziDps(1); % stimulus speed in deg per second
+        B{i}.ms=E{i}.resp_tSec{1}(:)*1000;
         K=cellfun(@transpose,E{i}.resp_yaw,'UniformOutput',false);
         B{i}.yaw={[K{:}]}; % 1 cell with matrix with columns being trials, rows being time-samples of yaw
         K=cellfun(@transpose,E{i}.resp_pitch,'UniformOutput',false);
         B{i}.pitch={[K{:}]}; % 1 cell with matrix with columns being trials, rows being time-samples of pitch
         K=cellfun(@transpose,E{i}.resp_roll,'UniformOutput',false);
         B{i}.roll={[K{:}]}; % 1 cell with matrix with columns being trials, rows being time-samples of roll
+        B{i}.framedropspersec={E{i}.nrMissedFlips./(E{i}.stopSec-E{i}.startSec)};
         B{i}.N=1;
     end 
     B=dpxdMerge(B);
