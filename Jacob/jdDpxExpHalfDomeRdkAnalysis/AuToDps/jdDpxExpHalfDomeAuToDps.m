@@ -3,8 +3,11 @@ function scalar = jdDpxExpHalfDomeAuToDps
     % in the movie in this folder,
     % ...\DPXperiments\Jacob\jdDpxExpHalfDomeRdkAnalysis\AuToDps\IMG_8642.m4v
     % you can see the ball make almost 7 rolls, stopping short at
-    % about 11 o'clock (if 12 o'clock is the top). This boils down to a
-    % total revolution of 7*360-30 = 2490 degress
+    % about 10 o'clock (if 12 o'clock is the top). This boils down to a
+    % total revolution of 7*360-60 = 2490 degress
+    %
+    % ball diameter is 19.7 cm btw (not needed for this calculation but can
+    % be used to calculate running speed in cm/s)
     
     totalDeg=2490;
     
@@ -20,7 +23,7 @@ function scalar = jdDpxExpHalfDomeAuToDps
     % I've looked at this data, and the ball start rolls between samples 385
     % to 916. Select that now
     
-    ioi=385:916; % interval of interest
+    ioi=400:905; % interval of interest
     roll=roll(ioi);
     
     % let's figure out how many seconds that was. looking from the movie,
@@ -32,17 +35,17 @@ function scalar = jdDpxExpHalfDomeAuToDps
     
     % that means the ball rolled for 
     
-    rollSeconds = numel(ioi)/sampleHz; % 8.87
+    rollSeconds = numel(ioi)/sampleHz;
     
     % thus, the speed of the ball;
     
-    ballDps = totalDeg/rollSeconds; % 281 dps
+    ballDps = totalDeg/rollSeconds; 
     
     % the speed in resp_mouseSide_dyPx is in Px per Frame. Now we have
     % enough info to convert px per frame (what we used to call arbitrary
     % units) to deg per second. This scalar is 
     
-    scalar = ballDps/nanmean(roll); %1.77
+    scalar = ballDps/nanmean(roll); 
     
     % i.e., multiply the pixel per frame value by scalar to get deg/s
     
