@@ -28,11 +28,12 @@ function DPXD=datafiles_to_barebones_dpxd(files)
         id_filename = fname(find(fname=='-',1,'first')+1:find(fname=='-',1,'last')-1);
         if ~strcmpi(id_dpxd,id_filename)
             fprintf('WARNING! ID in DPXD is %s but in filename it''s %s!!!\n',id_dpxd,id_filename);
-            %  fprintf('   Assuming it was entered wrong when recording and then corrected later in the fileNAME only\n');
-            %  fprintf('   Replaced the subject ID in the dpxd with the ID from the filename...\n');
-            %  D.exp_subjectId=repmat({id_filename},1,D.N);
-         %   fprintf(' ---> skipping file : %s\n', files{i} );
-         %   continue
+            if false
+                fprintf('   Assuming it was entered wrong when recording and then corrected later in the fileNAME only\n');
+                D.exp_subjectId=repmat({id_filename},1,D.N);
+                fprintf('   Replaced the subject ID in the dpxd with the ID from the filename...\n');
+            end
+            continue
         end
 
         [D,suspect]=clarifyAndCheck(D,response_interval_sec);

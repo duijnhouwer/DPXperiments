@@ -1,11 +1,11 @@
 function time_courses_olr_and_reversal
     
-    options.datafile='barebonesreversephidata_resampled16ms_bad_ids_ignored.mat';
+    options.datafile='barebonesreversephidata_resampled16ms.mat'; % created with datafiles_to_barebones_dpxd
     options.pitch_range=[1/(19.7*pi/360) Inf];  % 2 cm/second  = 2/(19.7*pi/360) deg/second because circumference of ball is 19.7*pi cm
     options.roll_range=[-Inf Inf];
     options.max_framedrops_per_second=6;
     options.min_trials_per_condition=35;
-    options.splineroughness=5e-8;
+    options.splineroughness=1e-9;
     options.splinestep_ms=100;
     options.min_spline_r2=0;
     options.detrend_per_trace_method='mean'; % 'mean','linear'
@@ -28,12 +28,12 @@ function time_courses_olr_and_reversal
     % remove the freezeflips that we don't want to analyse
     D=dpxdSubset(D,ismember(D.ff,options.freezeflips));
     if options.pool_freezeflips
-        D.freezeflip=666;
+        D.ff=repmat(666,1,D.N);
     end
     
     % keep only the mice we want to analyze (include_mice=0 means all)
     if options.include_mice
-        D=dpxdSubset(D,ismember(D.mouse,options.include_mice)); % for debugging
+        D=dpxdSubset(D,ismember(D.mouse,options.include_mice));
     end
     
     D=subset_trials_by_pitch_and_roll(D,options);
@@ -195,7 +195,6 @@ function D=convert_yaw_per_trial_to_yaw_per_condition(D,options)
         yaw_spline=nan(numel(spline_tt),size(D.yaw{i},2));
         for t=1:size(D.yaw{i},2)
             yy=D.yaw{i}(:,t);
-            yy=smooth(yy,20);
             perfectspline=csaps(tt,yy,1,spline_tt);
             splineyaw=csaps(tt,yy,options.splineroughness,spline_tt);
             % calculate the R2 of this spline so we can filter out really
@@ -225,7 +224,7 @@ function D=convert_yaw_per_trial_to_yaw_per_condition(D,options)
     [D.yaw_mean,D.yaw_sem]=deal(nan(size(D.ms)));
     for i=1:D.N
         D.yaw_mean(:,i)=nanmean(D.yaw{i},2);
-        D.yaw_sem(:,i)=nanstd(D.yaw{i},[],2)./size(D.yaw{i},2);
+        D.yaw_sem(:,i)=nanstd(D.yaw{i},[],2)/realsqrt(size(D.yaw{i},2));
     end
     toc(ttt);
     warning('on','SPLINES:CHCKXYWP:NaNs')
@@ -247,10 +246,18 @@ function plot_olrs(h,D)
     end
     [L,R]=dpxdSubset(D,D.dps<0); % left , right
     t=L.ms(:,1)/1000;
-    err=std(L.yaw_mean,[],2)/sqrt(size(L.yaw_mean,2));
+    if numel(unique(L.mouse))>1
+        err=std(L.yaw_mean,[],2)/sqrt(size(L.yaw_mean,2));
+    else
+        err=L.yaw_sem;
+    end
     revphi2019.jdPlotBounded('axes',h','x',t,'y',mean(L.yaw_mean,2),'eu',err,'ed',err,'Color','r','LineStyle',line);
     hold on
-    err=std(R.yaw_mean,[],2)/sqrt(size(R.yaw_mean,2));
+    if numel(unique(R.mouse))>1
+        err=std(R.yaw_mean,[],2)/sqrt(size(R.yaw_mean,2));
+    else
+        err=R.yaw_sem;
+    end
     revphi2019.jdPlotBounded('axes',h','x',t,'y',mean(R.yaw_mean,2),'eu',err,'ed',err,'Color','b','LineStyle',line);
     set(h,'Xlim',[min(t) max(t)]);
     cpsRefLine('-','k--');
@@ -275,7 +282,7 @@ function line_h=plot_right_minus_left(h,D)
         end
         t=L.ms(:,1)/1000;
         y=mean(right_minus_left,2)/2; % divide by 2, take mean of curves plotted as if motion is always to the right
-        e=std(right_minus_left,[],2)./size(right_minus_left,2);
+        e=std(right_minus_left,[],2)/sqrt(size(right_minus_left,2));
         line_h(m)=revphi2019.jdPlotBounded('axes',h','x',t,'y',y,'eu',e,'ed',e,'Color','m','LineStyle',line);
         hold on
         set(h,'Xlim',[min(t) max(t)]);
