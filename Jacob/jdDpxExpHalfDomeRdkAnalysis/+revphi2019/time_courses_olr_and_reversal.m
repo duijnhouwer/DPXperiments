@@ -7,7 +7,7 @@ function time_courses_olr_and_reversal
     options.min_spline_r2=0;
     options.detrend_per_mouse=true;
     options.nrows=4;
-    options.include_mice=1; % 0 and 1:9 mean all mice, 1 means mouse 1 etc, [1 2 4 5] means these mice
+    options.include_mice=1:9; % 0 and 1:9 mean all mice, 1 means mouse 1 etc, [1 2 4 5] means these mice
     options.freezeflips=[1 2 3 4 5 6 7]; % freezeflips to keep
     options.pool_freezeflips=false;
     options.reversal_measure='signed absolute product'; % tstat, linear, multiplicative, divisive, signrank, ttest
