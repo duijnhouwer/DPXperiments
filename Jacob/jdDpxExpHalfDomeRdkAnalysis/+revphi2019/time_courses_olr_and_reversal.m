@@ -1,7 +1,7 @@
 function time_courses_olr_and_reversal
     
     options.datafile='barebonesreversephidata_resampled16ms.mat'; % created with datafiles_to_barebones_dpxd
-    options.pitch_range=[1/(19.7*pi/360) Inf];  % 2 cm/second  = 2/(19.7*pi/360) deg/second because circumference of ball is 19.7*pi cm
+    options.pitch_range=[1/(19.7*pi/360) Inf];  % X cm/second  = X/(19.7*pi/360) deg/second because circumference of ball is 19.7*pi cm
     options.roll_range=[-Inf Inf];
     options.max_framedrops_per_second=6;
     options.min_trials_per_condition=35;
@@ -10,11 +10,13 @@ function time_courses_olr_and_reversal
     options.min_spline_r2=0;
     options.detrend_per_trace_method='mean'; % 'mean','linear'
     options.detrend_per_mouse_method='mean_limited_lifetime_yaw'; % 'none','mean_unlimited_lifetime_yaw','mean_limited_lifetime_yaw','linear_prestimon'
-    options.nrows=4;
-    options.include_mice=1:9; % 0 and 1:9 mean all mice, 1 means mouse 1 etc, [1 2 4 5] means these mice
-    options.freezeflips=[1 2 3 4 5 6 7]; % freezeflips to keep
+    options.nrows=3;
+    options.include_mice=3; % 0 and 1:9 mean all mice, 1 means mouse 1 etc, [1 2 4 5] means these mice
+    options.freezeflips=4;%[1 2 3 4 5 6 7]; % freezeflips to keep
     options.pool_freezeflips=false;
     options.reversal_measure='signed absolute product'; % tstat, linear, multiplicative, divisive, signrank, ttest
+    options.ttest_interval=[1 2];
+    options.ttest_alpha=0.05;
     
     ttt=tic;
     fprintf('[%s] loading %s ...',mfilename, options.datafile);
@@ -75,19 +77,19 @@ function time_courses_olr_and_reversal
     for i=1:n_freeze_flips
         [PHI,REV]=dpxdSubset(D{i},D{i}.mode=='p');
         h=subplot(options.nrows,n_freeze_flips,i);
-        plot_olrs(h,PHI);
+        plot_olrs(h,PHI,options,'left');
         if i==1
             xlabel('Time since motion onset (s)');
             ylabel('OLR (deg/s)');
         end
         h=subplot(options.nrows,n_freeze_flips,i+n_freeze_flips);
-        plot_olrs(h,REV);
+        plot_olrs(h,REV,options,'right');
         if i==1
             xlabel('Time since motion onset (s)');
             ylabel('OLR (deg/s)');
         end
         h=subplot(options.nrows,n_freeze_flips,i+2*n_freeze_flips);
-        line_handles=plot_right_minus_left(h,D{i});
+        line_handles=plot_right_minus_left(h,D{i},options);
         if i==1
             xlabel('Time since motion onset (s)');
             ylabel('OLR (deg/s)');
@@ -96,10 +98,9 @@ function time_courses_olr_and_reversal
     end
     cpsUnifyAxes
     
-    plot_diff_phi_contrast_inverted_revphi_contrast(D,options,4)
+   % plot_diff_phi_contrast_inverted_revphi_contrast(D,options,4)
     suptitle(['Mouse' sprintf(' %d',options.include_mice)]);
-    
-    options
+   
 end
 
 function D=remove_bad_trials(D,maxframedroprate)
@@ -225,6 +226,11 @@ function D=convert_yaw_per_trial_to_yaw_per_condition(D,options)
     for i=1:D.N
         D.yaw_mean(:,i)=nanmean(D.yaw{i},2);
         D.yaw_sem(:,i)=nanstd(D.yaw{i},[],2)/realsqrt(size(D.yaw{i},2));
+        time_ok = D.ms(:,i)>min(options.ttest_interval*1000) & D.ms(:,i)<max(options.ttest_interval*1000);
+        D.yaw_interval{i}=mean(D.yaw{i}(time_ok,:),1);
+        if any(isnan(D.yaw_interval{i}))
+            keyboard
+        end
     end
     toc(ttt);
     warning('on','SPLINES:CHCKXYWP:NaNs')
@@ -232,7 +238,7 @@ end
 
 
 
-function plot_olrs(h,D)
+function plot_olrs(h,D,options,tail)
     D=dpxdSubset(D,D.mode~='u'); % just in case the unlimited data is still in there
     if numel(unique(D.mode))>1
         error('more than 1 mode');
@@ -261,9 +267,29 @@ function plot_olrs(h,D)
     revphi2019.jdPlotBounded('axes',h','x',t,'y',mean(R.yaw_mean,2),'eu',err,'ed',err,'Color','b','LineStyle',line);
     set(h,'Xlim',[min(t) max(t)]);
     cpsRefLine('-','k--');
+    
+    if numel(unique(R.mouse))>1
+        left_vals=mean(L.yaw_mean(t>min(options.ttest_interval)&t<max(options.ttest_interval),:));
+        right_vals=mean(R.yaw_mean(t>min(options.ttest_interval)&t<max(options.ttest_interval),:));
+         [~,p,~,stats]=ttest(left_vals(:),right_vals(:),'tail',tail);
+          titstr=sprintf('paired t-test (one-sided):\nt(%d)=%.2f, p=%.3f',stats.df,stats.tstat,p); 
+    else
+       left_vals=L.yaw_interval{1};
+       right_vals=R.yaw_interval{1};
+       [~,p,~,stats]=ttest2(left_vals(:),right_vals(:),'tail',tail);
+       titstr=sprintf('two-sample t-test, (one-sided):\nt(%d)=%.2f, p=%.3f',stats.df,stats.tstat,p);
+    end
+    if p<0.05 && p>0.01
+        text(mean(options.ttest_interval),0,'*','FontSize',15,'HorizontalAlignment','center');
+    elseif p<0.01 && p>0.001
+        text(mean(options.ttest_interval),0,'**','FontSize',15,'HorizontalAlignment','center');
+    elseif p<0.001
+        text(mean(options.ttest_interval),0,'***','FontSize',15,'HorizontalAlignment','center');
+    end
+    title(titstr);
 end
 
-function line_h=plot_right_minus_left(h,D)
+function line_h=plot_right_minus_left(h,D,options)
     D=dpxdSubset(D,D.mode~='u'); % just in case the unlimited data is still in there
     [PHI,IHP]=dpxdSubset(D,D.mode=='p');
     for m=1:2
@@ -287,7 +313,25 @@ function line_h=plot_right_minus_left(h,D)
         hold on
         set(h,'Xlim',[min(t) max(t)]);
         cpsRefLine('-','k--');
+        % store mean YAW over interval of interest for t-test
+        if m==1
+            phi_vals=mean(right_minus_left(t>min(options.ttest_interval)&t<max(options.ttest_interval),:));
+        elseif m==2
+            revphi_vals=mean(right_minus_left(t>min(options.ttest_interval)&t<max(options.ttest_interval),:));
+        else
+            error('??');
+        end
     end
+    [~,p,~,stats]=ttest(phi_vals(:),revphi_vals(:),'tail','right');
+     titstr=sprintf('two-sample t-test, (one-sided):\nt(%d)=%.2f, p=%.3f',stats.df,stats.tstat,p);
+    if p<0.05 && p>0.01
+        text(mean(options.ttest_interval),0,'*','FontSize',15,'HorizontalAlignment','center');
+    elseif p<0.01 && p>0.001
+        text(mean(options.ttest_interval),0,'**','FontSize',15,'HorizontalAlignment','center');
+    elseif p<0.001
+        text(mean(options.ttest_interval),0,'***','FontSize',15,'HorizontalAlignment','center');
+    end
+    title(titstr);
 end
 
 

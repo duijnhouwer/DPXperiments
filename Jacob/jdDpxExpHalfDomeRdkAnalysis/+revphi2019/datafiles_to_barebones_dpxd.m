@@ -14,7 +14,7 @@ function DPXD=datafiles_to_barebones_dpxd(files)
         end
     end
     
-    response_interval_sec=-1:1/60:3; % (60Hz)
+    response_interval_sec=-1:1/60:3; % (60Hz is original sampling rate)
     response_interval_sec([1 end])=[]; % remove first and last because often missing (would be nan value at 1 and 3 otherwise)
     
     E={};    
@@ -102,11 +102,11 @@ function [D,suspect]=clarifyAndCheck(D,response_interval_sec)
         D.resp_yaw_corr{t}=corr(D.resp_mouseBack_dyPx{t}(:),D.resp_mouseSide_dyPx{t}(:));
         D.resp_tSec{t}=response_interval_sec;
         tsec=mean([D.resp_mouseBack_tSec{t}(:) D.resp_mouseSide_tSec{t}(:)],2)'; 
-        backyaw=interp1(tsec,D.resp_mouseBack_dyPx{t},response_interval_sec,'linear');
-        sideyaw=interp1(tsec,D.resp_mouseSide_dyPx{t},response_interval_sec,'linear');
+        backyaw=interp1(tsec,D.resp_mouseBack_dyPx{t},response_interval_sec,'pchip');
+        sideyaw=interp1(tsec,D.resp_mouseSide_dyPx{t},response_interval_sec,'pchip');
         D.resp_yaw{t}=mean([backyaw(:) sideyaw(:)],2)';
-        D.resp_pitch{t}=interp1(tsec,D.resp_mouseBack_dxPx{t},response_interval_sec,'linear');
-        D.resp_roll{t}=interp1(tsec,D.resp_mouseSide_dxPx{t},response_interval_sec,'linear');
+        D.resp_pitch{t}=interp1(tsec,D.resp_mouseBack_dxPx{t},response_interval_sec,'pchip');
+        D.resp_roll{t}=interp1(tsec,D.resp_mouseSide_dxPx{t},response_interval_sec,'pchip');
     end
     % Step 4: Convert yaw pixels/frame to deg/s (added 20170710)
     scalar = jdDpxExpHalfDomeAuToDps;
