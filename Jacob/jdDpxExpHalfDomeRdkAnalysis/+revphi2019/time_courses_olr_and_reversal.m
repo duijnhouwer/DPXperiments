@@ -11,8 +11,8 @@ function time_courses_olr_and_reversal
     options.detrend_per_trace_method='mean'; % 'mean','linear'
     options.detrend_per_mouse_method='mean_limited_lifetime_yaw'; % 'none','mean_unlimited_lifetime_yaw','mean_limited_lifetime_yaw','linear_prestimon'
     options.nrows=3;
-    options.include_mice=3; % 0 and 1:9 mean all mice, 1 means mouse 1 etc, [1 2 4 5] means these mice
-    options.freezeflips=4;%[1 2 3 4 5 6 7]; % freezeflips to keep
+    options.include_mice=1:9; % 0 and 1:9 mean all mice, 1 means mouse 1 etc, [1 2 4 5] means these mice
+    options.freezeflips=[1 2 3 4 5 6 7]; % freezeflips to keep
     options.pool_freezeflips=false;
     options.reversal_measure='signed absolute product'; % tstat, linear, multiplicative, divisive, signrank, ttest
     options.ttest_interval=[1 2];
@@ -135,10 +135,32 @@ function [D,good_mice]=remove_mice_conditions_with_too_few_n(D,min_trials_per_co
    D=dpxdSplit(D,'mouse');
    remove=false(size(D));
    good_mice=[];
+   
+   % 20191108, make a bargraph of the number of trails each mouse has
+   % completed
+   n_mice=numel(D);
+   n_reverse_phi_trials_per_mouse=[];
+   n_phi_trials_per_mouse=[];
+   for i=1:n_mice
+       PHI=dpxdSubset(D{i},D{i}.mode=='p');
+       IHP=dpxdSubset(D{i},D{i}.mode=='r');
+       n_phi_trials_per_mouse(i)=sum(cellfun(@(x)(size(x,2)),PHI.yaw));
+       n_reverse_phi_trials_per_mouse(i)=sum(cellfun(@(x)(size(x,2)),IHP.yaw));
+   end
+   
+   
+   cpsFindFig(sprintf('[%s] remove_mice_conditions_with_too_few_n',mfilename));
+   h=bar([n_phi_trials_per_mouse(:) n_reverse_phi_trials_per_mouse(:)]);
+   legend(h,{'Phi','Reverse-Phi'},'FontSize',12);
+   xlabel('Mouse ID','FontSize',16);
+   ylabel('Nr of trials','FontSize',16);
+   
+   
    for i=1:numel(D)
        if any(cellfun(@(x)(size(x,2)),D{i}.yaw)<min_trials_per_condition)
            remove(i)=true;
-           fprintf('[%s] Discarding mouse %d because one or more conditions had fewer that %d remaining trials\n',mfilename,unique(D{i}.mouse),min_trials_per_condition);
+           keyboard
+           fprintf('[%s] discarding mouse %d because one or more conditions had fewer that %d remaining trials\n',mfilename,unique(D{i}.mouse),min_trials_per_condition);
        else
            good_mice(end+1)=unique(D{i}.mouse); %#ok<AGROW>
        end
