@@ -11,7 +11,7 @@ function time_courses_olr_and_reversal
     options.detrend_per_trace_method='mean'; % 'mean','linear'
     options.detrend_per_mouse_method='mean_limited_lifetime_yaw'; % 'none','mean_unlimited_lifetime_yaw','mean_limited_lifetime_yaw','linear_prestimon'
     options.nrows=3;
-    options.include_mice=1:9; % 0 and 1:9 mean all mice, 1 means mouse 1 etc, [1 2 4 5] means these mice
+    options.include_mice=1%1:9; % 0 and 1:9 mean all mice, 1 means mouse 1 etc, [1 2 4 5] means these mice
     options.freezeflips=[1 2 3 4 5 6 7]; % freezeflips to keep
     options.pool_freezeflips=false;
     options.reversal_measure='signed absolute product'; % tstat, linear, multiplicative, divisive, signrank, ttest
@@ -159,7 +159,6 @@ function [D,good_mice]=remove_mice_conditions_with_too_few_n(D,min_trials_per_co
    for i=1:numel(D)
        if any(cellfun(@(x)(size(x,2)),D{i}.yaw)<min_trials_per_condition)
            remove(i)=true;
-           keyboard
            fprintf('[%s] discarding mouse %d because one or more conditions had fewer that %d remaining trials\n',mfilename,unique(D{i}.mouse),min_trials_per_condition);
        else
            good_mice(end+1)=unique(D{i}.mouse); %#ok<AGROW>
@@ -323,23 +322,35 @@ function line_h=plot_right_minus_left(h,D,options)
             line='--';
         end
         D=dpxdSplit(D,'mouse');
-        right_minus_left=[];
+        right_minus_left_mean=[];
         for i=1:numel(D)
             [L,R]=dpxdSubset(D{i},D{i}.dps<0);
-            right_minus_left(:,end+1)=R.yaw_mean(:)-L.yaw_mean(:); %#ok<AGROW>
+            right_minus_left_mean(:,end+1)=R.yaw_mean(:)-L.yaw_mean(:); %#ok<AGROW>
+            if numel(D)==1 % only one mouse selected
+                % calculate the pooled SEM
+                R_yaw_n=size(R.yaw{1},2);
+                L_yaw_n=size(L.yaw{1},2);
+                R_yaw_var=(R.yaw_sem*sqrt(R_yaw_n)).^2;
+                L_yaw_var=(L.yaw_sem*sqrt(L_yaw_n)).^2;
+                right_minus_left_sem = sqrt(R_yaw_var+L_yaw_var)./sqrt(R_yaw_n+L_yaw_n);
+            end
         end
         t=L.ms(:,1)/1000;
-        y=mean(right_minus_left,2)/2; % divide by 2, take mean of curves plotted as if motion is always to the right
-        e=std(right_minus_left,[],2)/sqrt(size(right_minus_left,2));
+        y=mean(right_minus_left_mean,2)/2; % divide by 2, take mean of curves plotted as if motion is always to the right
+        if numel(D)>1
+            e=std(right_minus_left_mean,[],2)/sqrt(size(right_minus_left_mean,2));
+        else % only one mouse selected
+            e=right_minus_left_sem;
+        end
         line_h(m)=revphi2019.jdPlotBounded('axes',h','x',t,'y',y,'eu',e,'ed',e,'Color','m','LineStyle',line);
         hold on
         set(h,'Xlim',[min(t) max(t)]);
         cpsRefLine('-','k--');
         % store mean YAW over interval of interest for t-test
         if m==1
-            phi_vals=mean(right_minus_left(t>min(options.ttest_interval)&t<max(options.ttest_interval),:));
+            phi_vals=mean(right_minus_left_mean(t>min(options.ttest_interval)&t<max(options.ttest_interval),:));
         elseif m==2
-            revphi_vals=mean(right_minus_left(t>min(options.ttest_interval)&t<max(options.ttest_interval),:));
+            revphi_vals=mean(right_minus_left_mean(t>min(options.ttest_interval)&t<max(options.ttest_interval),:));
         else
             error('??');
         end
