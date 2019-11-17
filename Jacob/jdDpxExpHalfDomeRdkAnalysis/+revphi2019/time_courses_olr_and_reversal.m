@@ -101,36 +101,8 @@ function time_courses_olr_and_reversal
     % plot_diff_phi_contrast_inverted_revphi_contrast(D,options,4)
     suptitle(['Mouse' sprintf(' %d',options.include_mice)]);
     
-    
-    ff=nan(1,n_freeze_flips);
-    phi_mean=nan(1,n_freeze_flips);
-    revphi_mean=nan(1,n_freeze_flips);
-    phi_sem=nan(1,n_freeze_flips);
-    revphi_sem=nan(1,n_freeze_flips);
-    for i=1:n_freeze_flips
-        ff(i)=unique(D{i}.ff);
-        phi_mean(i)= mean(olr_per_mouse(i).phi);
-        revphi_mean(i)=mean(olr_per_mouse(i).revphi);
-        phi_sem(i)=std(olr_per_mouse(i).phi)/sqrt(numel(olr_per_mouse(i).phi));
-        revphi_sem(i)=std(olr_per_mouse(i).revphi)/sqrt(numel(olr_per_mouse(i).revphi));
-    end
-    fig=cpsFindFig('OLR_FrameDUration');
-    set(fig,'defaultLegendAutoUpdate','off');
-    clf(fig);
-    h(1)=errorbar(ff,phi_mean,phi_sem,'ok-','LineWidth',1,'MarkerFaceColor','k');
-    hold on
-    h(2)=errorbar(ff,revphi_mean,revphi_sem,'ok--','LineWidth',1,'MarkerFaceColor','w');
-    xlabel('Frame duration (ms)','FontSize',14);
-    ylabel('OLR (deg/s)','FontSize',14);
-    legend(h,{'Phi motion','Reverse phi motion'},'FontSize',12);
-    box off
-    set(gca,'XLim',[0.5 n_freeze_flips+0.5]);
-    set(gca,'XTickLabel',round((1:n_freeze_flips)*1000/60));
-    set(gca,'YLim',[-40 40]);
-    drawnow
-    pause(1/10);
-    cpsRefLine('-','k--')
-    
+    %
+    plot_mean_olr_over_freezeframes(olr_per_mouse,n_freeze_flips,D)
 end
 
 function D=remove_bad_trials(D,maxframedroprate)
@@ -371,6 +343,7 @@ function [line_h,olr_permouse_12sec]=plot_right_minus_left(h,D,options)
                 right_minus_left_sem = sqrt(R_yaw_var+L_yaw_var)./sqrt(R_yaw_n+L_yaw_n);
             else
                 olr_permouse_12sec.(field)(i)=mean(right_minus_left_mean(R.ms>=1000&R.ms<2000,end));
+                olr_permouse_12sec.(field)(i) =olr_permouse_12sec.(field)(i)/2; % divide by 2 to get mean OLR
             end
         end
         t=L.ms(:,1)/1000;
@@ -445,5 +418,40 @@ function plot_diff_phi_contrast_inverted_revphi_contrast(D,options,row)
         cpsRefLine(reverseaxes(i),'-','k--');
     end
     cpsUnifyAxes(reverseaxes);
+end
+
+
+function plot_mean_olr_over_freezeframes(olr_per_mouse,n_freeze_flips,D)
+    
+    % olr_per_mouse is 2nd output of plot_left_vs_right
+    fig=cpsFindFig('plot_mean_olr_over_freezeframes');
+  
+    ff=nan(1,n_freeze_flips);
+    phi_mean=nan(1,n_freeze_flips);
+    revphi_mean=nan(1,n_freeze_flips);
+    phi_sem=nan(1,n_freeze_flips);
+    revphi_sem=nan(1,n_freeze_flips);
+    for i=1:n_freeze_flips
+        ff(i)=unique(D{i}.ff);
+        phi_mean(i)= mean(olr_per_mouse(i).phi);
+        phi_sem(i)=std(olr_per_mouse(i).phi)/sqrt(numel(olr_per_mouse(i).phi));
+        revphi_mean(i)=mean(olr_per_mouse(i).revphi);
+        revphi_sem(i)=std(olr_per_mouse(i).revphi)/sqrt(numel(olr_per_mouse(i).revphi));
+    end
+    set(fig,'defaultLegendAutoUpdate','off');
+    clf(fig);
+    h(1)=errorbar(ff,phi_mean,phi_sem,'ok-','LineWidth',1,'MarkerFaceColor','k');
+    hold on
+    h(2)=errorbar(ff,revphi_mean,revphi_sem,'ok--','LineWidth',1,'MarkerFaceColor','w');
+    xlabel('Frame duration (ms)','FontSize',14);
+    ylabel('OLR (deg/s)','FontSize',14);
+    legend(h,{'Phi motion','Reverse phi motion'},'FontSize',12);
+    box off
+    set(gca,'XLim',[0.5 n_freeze_flips+0.5]);
+    set(gca,'XTickLabel',round((1:n_freeze_flips)*1000/60));
+    set(gca,'YLim',[-20 20]);
+    drawnow
+    pause(1/10);
+    cpsRefLine('-','k--')
 end
 
